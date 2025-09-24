@@ -6,7 +6,7 @@ const height = 600 - margin.top - margin.bottom;
 // 2. SVG 요소 설정
 const svg = d3.select("#area-chart")
     .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
+    .attr("height", height + margin.top - margin.bottom)
   .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -44,8 +44,11 @@ Promise.all([
         .attr("x", width / 2).attr("y", 40).attr("fill", "#000")
         .attr("font-weight", "bold").text("출시 후 경과일 (Days after release)");
 
+    // ✅ 여기가 수정된 부분입니다. .ticks()와 .tickFormat()을 분리했습니다.
     svg.append("g")
-        .call(d3.axisLeft(yScale).ticks(5, d => (d >= 1000000 ? `${d / 1000000}M` : `${d / 1000}k`)))
+        .call(d3.axisLeft(yScale)
+            .ticks(5)
+            .tickFormat(d => (d >= 1000000 ? `${d / 1000000}M` : `${d / 1000}k`)))
         .append("text")
         .attr("transform", "rotate(-90)").attr("y", -50).attr("x", -height / 2).attr("fill", "#000")
         .attr("font-weight", "bold").attr("text-anchor", "middle").text("동시 접속자 수");
@@ -67,11 +70,4 @@ Promise.all([
     svg.append("path")
         .datum(worldData)
         .attr("fill", "#405d7b")
-        .attr("opacity", 0.7)
-        .attr("d", areaGenerator);
-
-}).catch(error => {
-    // 만약 이 코드로도 차트가 보이지 않는다면, 콘솔에 에러가 표시될 겁니다.
-    console.error("기본 차트 로딩 중 오류 발생:", error);
-    d3.select("#chart-container").text("오류 발생! F12를 눌러 Console을 확인해주세요.");
-});
+        .attr("opacity", 0
