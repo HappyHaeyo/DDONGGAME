@@ -21,16 +21,15 @@ h1{color:#2c3e50;margin:20px 0 0}
 #help summary{cursor:pointer;font-weight:700}
 #help ul{margin:8px 0 8px 18px}
 
-.tooltip{position:absolute;text-align:center;padding:8px 10px;font:12px/1.3 sans-serif;background:rgba(0,0,0,.85);color:#fff;border-radius:6px;pointer-events:none;opacity:0;transition:opacity .15s}
+.tooltip{position:absolute;text-align:center;padding:8px 10px;font:12px/1.3 sans-serif;background:rgba(0,0,0,.88);color:#fff;border-radius:6px;pointer-events:none;opacity:0;transition:opacity .12s}
 
-/* focus */
 .focus-line{stroke:#888;stroke-width:1px;stroke-dasharray:3,3}
 .focus-circle{fill:#fff;stroke:#000;stroke-width:2px}
 .focus-diff{stroke:#333;stroke-width:2px}
 
-/* event stars (hover만 표시용) */
+/* 이벤트 별 + 호버 가이드라인 */
 .event-star{cursor:pointer}
 .event-hover-line{stroke-width:2px;stroke-dasharray:4 4;opacity:0}
 
-/* axes */
+/* 축 */
 .tick text{font-size:12px}
