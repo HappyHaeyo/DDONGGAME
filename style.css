@@ -1,33 +1,61 @@
+:root{
+  /* Okabe–Ito 팔레트(색약 친화) */
+  --wilds-fill:  #E69F00; /* 황토 */
+  --wilds-stroke:#955E00;
+  --world-fill:  #56B4E9; /* 하늘 */
+  --world-stroke:#2F6E8E;
+
+  --event:       #D55E00; /* 이벤트 강조색 */
+}
+
 body {
   font-family: Arial, sans-serif;
-  display: flex; flex-direction: column; align-items: center;
+  display:flex; flex-direction:column; align-items:center;
   background:#f4f4f9; color:#333; margin:0;
 }
-h1 { color:#2c3e50; margin-top:20px; }
+h1{ color:#2c3e50; margin:20px 0 0; }
 
-#chart-container {
-  background:#fff; padding:20px; border-radius:8px;
-  box-shadow:0 4px 8px rgba(0,0,0,.1); margin-top:20px;
+#chart-container{
+  background:#fff; padding:20px; border-radius:12px;
+  box-shadow:0 6px 20px rgba(0,0,0,.08);
+  margin:20px 0 10px; width: fit-content;
 }
 
-.tooltip {
-  position:absolute; text-align:center; padding:8px;
-  font:12px sans-serif; background:rgba(0,0,0,.85); color:#fff;
+#legend{ display:flex; gap:28px; margin:8px 0 10px; }
+.legend-item{ display:flex; align-items:center; font-size:14px; }
+.color-box{ width:14px; height:14px; margin-right:8px; border-radius:3px; }
+#swatch-wilds{ background:var(--wilds-fill); }
+#swatch-world{ background:var(--world-fill); }
+
+#help{
+  width:min(1080px, 90vw);
+  background:#fff;
+  border-radius:12px;
+  box-shadow:0 6px 20px rgba(0,0,0,.06);
+  padding:10px 16px; margin:6px 0 24px;
+}
+#help summary{ cursor:pointer; font-weight:700; }
+#help ul{ margin:8px 0 8px 18px; }
+
+.tooltip{
+  position:absolute; text-align:center; padding:8px 10px;
+  font:12px/1.3 sans-serif; background:rgba(0,0,0,.85); color:#fff;
   border-radius:6px; pointer-events:none; opacity:0; transition:opacity .15s;
 }
 
-/* focus line & dots */
-.focus-line { stroke:#888; stroke-width:1px; stroke-dasharray:3,3; }
-.focus-circle { fill:#fff; stroke:#000; stroke-width:2px; }
+/* focus */
+.focus-line{ stroke:#888; stroke-width:1px; stroke-dasharray:3,3; }
+.focus-circle{ fill:#fff; stroke:#000; stroke-width:2px; }
 
-/* event visuals */
-.event-line   { stroke:#e4572e; stroke-width:2px; stroke-dasharray:4 4; }
-.event-symbol { fill:#e4572e; stroke:#fff; stroke-width:1.2px; }
-.event-label  { font-size:12px; font-weight:700; fill:#2c3e50; paint-order:stroke; stroke:#fff; stroke-width:3px; }
-.event-label-foreground { fill:#2c3e50; stroke:none; } /* 앞쪽 텍스트 (진짜 글자) */
-.event-label-bg { fill:#ffffff; opacity:.85; rx:4; ry:4; }
+/* events */
+.event-line{ stroke:var(--event); stroke-width:2px; stroke-dasharray:4 4; }
+.event-symbol{ fill:var(--event); stroke:#fff; stroke-width:1.2px; }
+.event-label{
+  font-size:12px; font-weight:700; fill:#1b2430;
+  /* 외곽선은 paint-order로 한 번만 그림 (겹침/잔상 방지) */
+  paint-order: stroke; stroke:#fff; stroke-width:3px; stroke-linejoin:round;
+}
+.event-label-bg{ fill:#fff; opacity:.9; rx:4; ry:4; }
 
-/* legend */
-#legend { margin:14px 0 24px; display:flex; gap:24px; justify-content:center; }
-.legend-item { display:flex; align-items:center; font-size:14px; }
-.color-box { width:14px; height:14px; margin-right:8px; border-radius:3px; }
+/* axes */
+.tick text{ font-size:12px; }
