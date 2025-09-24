@@ -1,18 +1,27 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Area Chart</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CSV Area Chart</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-    <h1>Data Visualization: World vs Wilds</h1>
-    <div id="chart-container">
-        <svg id="area-chart"></svg>
+  <h1>Data Visualization: World vs Wilds</h1>
+  <div id="chart-container">
+    <svg id="area-chart"></svg>
+  </div>
+
+  <div id="legend">
+    <div class="legend-item">
+      <span class="color-box" style="background:#405d7b"></span> MHW: World
     </div>
-    
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="script.js"></script>
+    <div class="legend-item">
+      <span class="color-box" style="background:#d95f02"></span> MHW: Wilds
+    </div>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
