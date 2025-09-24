@@ -1,81 +1,30 @@
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: #f4f4f9;
-    color: #333;
-    margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #f4f4f9;
+  color: #333;
+  margin: 0;
 }
-
-h1 {
-    color: #2c3e50;
-    margin-top: 20px;
-}
-
+h1 { color:#2c3e50; margin-top:20px; }
 #chart-container {
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    margin-top: 20px;
+  background:#fff; padding:20px; border-radius:8px;
+  box-shadow:0 4px 8px rgba(0,0,0,0.1); margin-top:20px;
 }
-
-/* 팝업(툴팁) 스타일 */
+/* 툴팁 */
 .tooltip {
-    position: absolute;
-    text-align: center;
-    padding: 8px;
-    font: 12px sans-serif;
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    border-radius: 5px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s;
+  position:absolute; text-align:center; padding:8px; font:12px/1.3 sans-serif;
+  background:rgba(0,0,0,0.85); color:#fff; border-radius:6px; pointer-events:none;
+  opacity:0; transition:opacity .15s;
 }
-
-/* 이벤트 마커 스타일 */
-.event-line {
-    stroke: #e4572e;
-    stroke-width: 2px;
-    stroke-dasharray: 4, 4; /* 점선 스타일 */
-}
-
-.event-label {
-    font-size: 12px;
-    font-weight: bold;
-    fill: #2c3e50;
-    text-anchor: middle; /* 텍스트 중앙 정렬 */
-}
-
-/* 범례 스타일 */
-#legend {
-    margin-top: 20px;
-    display: flex;
-    gap: 20px;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    font-size: 14px;
-}
-
-.color-box {
-    width: 15px;
-    height: 15px;
-    margin-right: 8px;
-    border-radius: 3px;
-}
-.focus-line {
-  stroke: #888;
-  stroke-width: 1px;
-  stroke-dasharray: 3, 3;
-}
-
-.focus-circle {
-  fill: none;
-  stroke: black;
-  stroke-width: 2px;
-}
+/* 이벤트 마커 */
+.event-line { stroke:#e4572e; stroke-width:2px; stroke-dasharray:4 4; }
+.event-label { font-size:12px; font-weight:700; fill:#2c3e50; }
+/* 포커스 */
+.focus-line { stroke:#888; stroke-width:1px; stroke-dasharray:3 3; }
+.focus-circle { fill:#fff; stroke:#000; stroke-width:2px; }
+/* 범례 */
+#legend { margin:14px 0 24px; display:flex; gap:24px; }
+.legend-item { display:flex; align-items:center; font-size:14px; }
+.color-box { width:14px; height:14px; margin-right:8px; border-radius:3px; }
