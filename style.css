@@ -5,10 +5,12 @@ body {
     align-items: center;
     background-color: #f4f4f9;
     color: #333;
+    margin: 0;
 }
 
 h1 {
     color: #2c3e50;
+    margin-top: 20px;
 }
 
 #chart-container {
@@ -16,27 +18,53 @@ h1 {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    margin-top: 20px;
 }
 
 /* 팝업(툴팁) 스타일 */
 .tooltip {
     position: absolute;
     text-align: center;
-    width: auto;
-    height: auto;
     padding: 8px;
     font: 12px sans-serif;
-    background: #2c3e50;
+    background: rgba(0, 0, 0, 0.8);
     color: white;
-    border: 0px;
-    border-radius: 8px;
-    pointer-events: none; /* 마우스 이벤트가 툴팁을 통과하도록 설정 */
-    opacity: 0; /* 기본적으로 숨김 */
+    border-radius: 5px;
+    pointer-events: none;
+    opacity: 0;
     transition: opacity 0.2s;
 }
 
-/* 축 스타일 */
-.axis-label {
+/* 이벤트 마커 스타일 */
+.event-line {
+    stroke: #e4572e;
+    stroke-width: 2px;
+    stroke-dasharray: 4, 4; /* 점선 스타일 */
+}
+
+.event-label {
+    font-size: 12px;
+    font-weight: bold;
+    fill: #2c3e50;
+    text-anchor: middle; /* 텍스트 중앙 정렬 */
+}
+
+/* 범례 스타일 */
+#legend {
+    margin-top: 20px;
+    display: flex;
+    gap: 20px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
     font-size: 14px;
-    font-weight: 500;
+}
+
+.color-box {
+    width: 15px;
+    height: 15px;
+    margin-right: 8px;
+    border-radius: 3px;
 }
