@@ -4,8 +4,10 @@ body {
   flex-direction: column;
   align-items: center;
   background-color: #f4f4f9;
+  color: #333;
   margin: 0;
 }
+h1 { color:#2c3e50; margin-top:20px; }
 
 #chart-container {
   background: #fff;
@@ -28,31 +30,9 @@ body {
   transition: opacity 0.15s;
 }
 
-.focus-line {
-  stroke: #888;
-  stroke-width: 1px;
-  stroke-dasharray: 3,3;
-}
+.focus-line { stroke:#888; stroke-width:1px; stroke-dasharray:3,3; }
+.focus-circle { fill:#fff; stroke:#000; stroke-width:2px; }
 
-.focus-circle {
-  fill: #fff;
-  stroke: #000;
-  stroke-width: 2px;
-}
-
-#legend {
-  margin: 14px 0 24px;
-  display: flex;
-  gap: 24px;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-}
-.color-box {
-  width: 14px;
-  height: 14px;
-  margin-right: 8px;
-  border-radius: 3px;
-}
+#legend { margin:14px 0 24px; display:flex; gap:24px; }
+.legend-item { display:flex; align-items:center; font-size:14px; }
+.color-box { width:14px; height:14px; margin-right:8px; border-radius:3px; }
