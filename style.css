@@ -14,9 +14,7 @@ body {
 }
 h1{ color:#2c3e50; margin:20px 0 0; }
 
-#controls{
-  display:flex; gap:8px; margin:10px 0;
-}
+#controls{ display:flex; gap:8px; margin:10px 0; }
 #controls button{
   border:1px solid #cfd6df; background:#fff; padding:8px 12px; border-radius:8px;
   cursor:pointer; font-weight:600;
