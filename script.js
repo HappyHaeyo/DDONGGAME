@@ -1,6 +1,6 @@
 'use strict';
 
-// --------- 기본 설정 ---------
+/* ===== 기본 설정 ===== */
 var margin = { top: 40, right: 30, bottom: 55, left: 80 };
 var width  = 1200 - margin.left - margin.right;
 var height = 600  - margin.top  - margin.bottom;
@@ -13,59 +13,47 @@ var svg = d3.select('#area-chart')
 
 var tooltip = d3.select('body').append('div').attr('class', 'tooltip');
 
-// 데이터 경로
+/* ===== 색 정의 ===== */
+var COLOR = {
+  wildsFill:  getComputedStyle(document.documentElement).getPropertyValue('--wilds-fill').trim() || '#E69F00',
+  wildsLine:  getComputedStyle(document.documentElement).getPropertyValue('--wilds-stroke').trim() || '#955E00',
+  worldFill:  getComputedStyle(document.documentElement).getPropertyValue('--world-fill').trim() || '#56B4E9',
+  worldLine:  getComputedStyle(document.documentElement).getPropertyValue('--world-stroke').trim() || '#2F6E8E',
+  event:      getComputedStyle(document.documentElement).getPropertyValue('--event').trim() || '#D55E00'
+};
+
+/* ===== 파일 경로 ===== */
 var wildsPath = 'data/wilds_data.csv';
 var worldPath = 'data/world_data.csv';
 
-// 출시일 (이벤트 day 계산용)
+/* ===== 출시일 & 이벤트 ===== */
 var releaseDates = {
   world: new Date('2018-08-09'),
   wilds: new Date('2025-02-28')
 };
-
-// 이벤트 (원하면 더 추가)
 var events = [
   { date: '2018-09-06', label: 'PC 최적화 패치', game: 'world' },
   { date: '2020-01-09', label: '아이스본 출시',   game: 'world' }
-  // { date: '2025-05-10', label: '대형 업데이트', game: 'wilds' }
 ];
 
-// 로그축 하한 (필요시 10000 등으로 조정)
+/* ===== 스케일/레이어 ===== */
 var minY = 1000;
-
-// 전역 스케일(원본)
-var x0 = d3.scaleLinear().range([0, width]);
+var x0 = d3.scaleLinear().range([0, width]);   // 원본 x
+var x  = x0.copy();                             // 현재 x(줌 반영)
 var y  = d3.scaleLog().range([height, 0]).clamp(true);
 
-// 현재 적용 스케일(줌/팬 반영본)
-var x = x0.copy();
-
-// path/axis를 묶어두는 레이어
 var defs = svg.append('defs');
 defs.append('clipPath').attr('id', 'clip')
   .append('rect').attr('width', width).attr('height', height);
 
-var areaLayer = svg.append('g').attr('clip-path', 'url(#clip)');
-var lineLayer = svg.append('g').attr('clip-path', 'url(#clip)');
-var eventLayer= svg.append('g'); // 라인/아이콘/라벨은 영역 위에
-var uiLayer   = svg.append('g'); // focus/overlay
+var areaLayer  = svg.append('g').attr('clip-path','url(#clip)');
+var lineLayer  = svg.append('g').attr('clip-path','url(#clip)');
+var eventLayer = svg.append('g');
+var uiLayer    = svg.append('g');
 
-// 포커스(툴팁)
-var focus = uiLayer.append('g').style('opacity', 0);
-focus.append('line').attr('class', 'focus-line').attr('y1', 0).attr('y2', height);
-var dotWorld = focus.append('circle').attr('r', 4).attr('class', 'focus-circle');
-var dotWilds = focus.append('circle').attr('r', 4).attr('class', 'focus-circle');
-
-// 마우스 리스닝 + 줌/팬
-var overlay = uiLayer.append('rect')
-  .attr('width', width).attr('height', height)
-  .style('fill', 'none').style('pointer-events', 'all');
-
-// 축
+/* 축 */
 var xAxisG = svg.append('g').attr('transform', 'translate(0,' + height + ')');
 var yAxisG = svg.append('g');
-
-// 축 라벨
 xAxisG.append('text')
   .attr('x', width/2).attr('y', 45)
   .attr('fill','#000').attr('font-weight','bold').attr('text-anchor','middle')
@@ -76,21 +64,29 @@ yAxisG.append('text')
   .attr('fill','#000').attr('font-weight','bold').attr('text-anchor','middle')
   .text('동시 접속자 수 (로그 스케일)');
 
-// 도형 생성기
-function ySafe(v){ return y(Math.max(minY, v)); }
+/* 포커스/툴팁 */
+var focus = uiLayer.append('g').style('opacity', 0);
+focus.append('line').attr('class','focus-line').attr('y1',0).attr('y2',height);
+var dotWorld = focus.append('circle').attr('r',4).attr('class','focus-circle');
+var dotWilds = focus.append('circle').attr('r',4).attr('class','focus-circle');
 
+var overlay = uiLayer.append('rect')
+  .attr('width', width).attr('height', height)
+  .style('fill','none').style('pointer-events','all');
+
+/* 도형 생성기 */
+function ySafe(v){ return y(Math.max(minY, v)); }
 var areaGen = d3.area()
   .x(function(d){ return x(d.days); })
   .y0(function(){ return y(minY); })
   .y1(function(d){ return ySafe(d.players); })
   .curve(d3.curveMonotoneX);
-
 var lineGen = d3.line()
   .x(function(d){ return x(d.days); })
   .y(function(d){ return ySafe(d.players); })
   .curve(d3.curveMonotoneX);
 
-// 데이터 로드
+/* 데이터 로드 */
 Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
   var wilds = res[0].map(function(d){ return { days:+d.days, players:+d.players }; })
                    .filter(function(d){ return isFinite(d.days) && isFinite(d.players); })
@@ -99,7 +95,6 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
                    .filter(function(d){ return isFinite(d.days) && isFinite(d.players); })
                    .sort(function(a,b){ return a.days - b.days; });
 
-  // 도메인
   var maxDays = Math.max(
     d3.max(wilds, function(d){ return d.days; }) || 0,
     d3.max(world, function(d){ return d.days; }) || 0
@@ -113,44 +108,39 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
   x.domain(x0.domain());
   y.domain([minY, maxPlayers]);
 
-  // 초기 요소 생성 (경로는 바인딩만)
+  /* 그리기(순서: Wilds→World) */
   var wildsArea = areaLayer.append('path').datum(wilds)
-    .attr('fill', '#d95f02').attr('opacity', .65);
+    .attr('fill', COLOR.wildsFill).attr('opacity', .7);
   var wildsLine = lineLayer.append('path').datum(wilds)
-    .attr('fill', 'none').attr('stroke', '#9a3f00').attr('stroke-width', 1.5);
+    .attr('fill','none').attr('stroke', COLOR.wildsLine).attr('stroke-width', 1.4);
 
   var worldArea = areaLayer.append('path').datum(world)
-    .attr('fill', '#405d7b').attr('opacity', .7);
+    .attr('fill', COLOR.worldFill).attr('opacity', .75);
   var worldLine = lineLayer.append('path').datum(world)
-    .attr('fill', 'none').attr('stroke', '#2c3e50').attr('stroke-width', 1.6);
+    .attr('fill','none').attr('stroke', COLOR.worldLine).attr('stroke-width', 1.4);
 
-  // 이벤트 그룹 생성
-  var eventG = eventLayer.selectAll('.ev').data(events.filter(function(ev){
-    var dday = dayFromRelease(ev.date, ev.game);
-    return dday >= 0 && dday <= maxDays;
-  })).enter().append('g').attr('class','ev');
+  /* 이벤트 요소 */
+  var evData = events
+    .map(function(ev){
+      return { x: dayFromRelease(ev.date, ev.game), label: ev.label };
+    })
+    .filter(function(e){ return e.x >= 0 && e.x <= maxDays; })
+    .sort(function(a,b){ return a.x - b.x; });
 
-  // 수직선
-  eventG.append('line')
-    .attr('class', 'event-line')
-    .attr('y1', 0).attr('y2', height);
+  var evG = eventLayer.selectAll('.ev').data(evData).enter().append('g').attr('class','ev');
 
-  // 아이콘 (다이아몬드)
-  eventG.append('path')
-    .attr('class', 'event-symbol')
-    .attr('d', d3.symbol().type(d3.symbolDiamond).size(70));
+  evG.append('line').attr('class','event-line').attr('y1',0).attr('y2',height);
+  evG.append('path').attr('class','event-symbol')
+     .attr('d', d3.symbol().type(d3.symbolDiamond).size(72))
+     .attr('transform','translate(0,12)');
+  evG.append('rect').attr('class','event-label-bg');
+  evG.append('text').attr('class','event-label').attr('dy','0.35em');
 
-  // 라벨: 배경 rect + 외곽선 텍스트(얇은 하얀 stroke) + 본문 텍스트(앞쪽)
-  eventG.append('rect').attr('class','event-label-bg');
-  eventG.append('text').attr('class','event-label').attr('dy', '0.35em');            // 외곽선
-  eventG.append('text').attr('class','event-label-foreground').attr('dy', '0.35em'); // 본문
-
-  // 축 그리기 + 경로 업데이트 + 이벤트 위치 업데이트
+  /* 초기 렌더 */
   render();
 
-  // 포인터/툴팁
+  /* 툴팁/포커스 */
   var bisect = d3.bisector(function(d){ return d.days; }).left;
-
   overlay
     .on('mouseover', function(){ focus.style('opacity',1); tooltip.style('opacity',1); })
     .on('mouseout',  function(){ focus.style('opacity',0); tooltip.style('opacity',0); })
@@ -165,9 +155,7 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
         if (!a0 || !a1) return a0 || a1;
         return (dayX - a0.days) < (a1.days - dayX) ? a0 : a1;
       }
-
-      var pw = pick(world);
-      var pz = pick(wilds);
+      var pw = pick(world), pz = pick(wilds);
       if (!pw && !pz) return;
 
       var anchor = pw && pz ? (Math.abs(pw.days - dayX) <= Math.abs(pz.days - dayX) ? pw.days : pz.days)
@@ -178,14 +166,14 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
       if (pz) { dotWilds.style('opacity',1).attr('cy', ySafe(pz.players)); } else { dotWilds.style('opacity',0); }
 
       var html = '<strong>Day ' + anchor + '</strong><br/>' +
-                 '<span style="color:#405d7b">World:</span> ' + (pw ? pw.players.toLocaleString() : 'N/A') + '<br/>' +
-                 '<span style="color:#d95f02">Wilds:</span> ' + (pz ? pz.players.toLocaleString() : 'N/A');
+                 '<span style="color:' + COLOR.worldLine + '">World:</span> ' + (pw ? pw.players.toLocaleString() : 'N/A') + '<br/>' +
+                 '<span style="color:' + COLOR.wildsLine + '">Wilds:</span> ' + (pz ? pz.players.toLocaleString() : 'N/A');
       tooltip.html(html)
         .style('left', (event.pageX + 14) + 'px')
         .style('top',  (event.pageY - 28) + 'px');
     });
 
-  // --------- 줌/팬 ----------
+  /* 줌/팬 + 리셋 */
   var zoom = d3.zoom()
     .scaleExtent([1, 20])
     .translateExtent([[0,0],[width,height]])
@@ -194,78 +182,83 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
       x = event.transform.rescaleX(x0);
       render();
     });
-
-  // 더블클릭 리셋
+  svg.call(zoom);
   overlay.on('dblclick', function(){
-    svg.transition().duration(250);
-    d3.select('#area-chart').transition().duration(0); // no-op
-    overlay.transition().duration(0);
+    svg.transition().duration(0);
     x = x0.copy();
     svg.call(zoom.transform, d3.zoomIdentity);
     render();
   });
 
-  svg.call(zoom);
-
-  // --------- 렌더 함수 ----------
+  /* ===== 렌더 함수 ===== */
   function render(){
-    // 축
+    /* 축 */
     xAxisG.call(d3.axisBottom(x));
     yAxisG.call(d3.axisLeft(y).ticks(6, function(d){
-      return d >= 1000000 ? (d/1000000) + 'M' : (d/1000) + 'k';
+      return d >= 1e6 ? (d/1e6)+'M' : (d/1e3)+'k';
     }));
 
-    // 경로
-    wildsArea.attr('d', areaGen);
-    wildsLine.attr('d', lineGen);
-    worldArea.attr('d', areaGen);
-    worldLine.attr('d', lineGen);
+    /* 경로 */
+    wildsArea.attr('d', areaGen);  wildsLine.attr('d', lineGen);
+    worldArea.attr('d', areaGen);  worldLine.attr('d', lineGen);
 
-    // 이벤트 위치/라벨
-    eventG.attr('transform', function(ev){
-      var dday = dayFromRelease(ev.date, ev.game);
-      var tx = x(dday);
-      return 'translate(' + tx + ',0)';
+    /* 이벤트 위치 업데이트 */
+    evG.attr('transform', function(d){ return 'translate(' + x(d.x) + ',0)'; });
+    evG.select('line.event-line').attr('y2', height);
+
+    /* 라벨 배치 (겹침 방지) */
+    // 1) 기본 anchor 위치 계산
+    var anchors = evData.map(function(d){
+      return { x: x(d.x), width: 0, d: d, xFinal: 0 };
     });
 
-    // 수직선
-    eventG.select('line.event-line').attr('y1', 0).attr('y2', height);
-
-    // 아이콘은 차트 상단에 조금 여백 두고 배치
-    eventG.select('path.event-symbol')
-      .attr('transform', 'translate(0,12)');
-
-    // 라벨: 아이콘 오른쪽에 배치
-    eventG.each(function(ev){
+    // 2) 실제 라벨 width 계산을 위해 먼저 텍스트 그려서 bbox 측정
+    evG.each(function(d, i){
       var g = d3.select(this);
-      var padding = 4;
-      var xoff = 8;    // 수직선에서 오른쪽으로
-      var yoff = 12;   // 상단에서 약간 아래
-
-      // 외곽선 텍스트와 본문 텍스트 같은 위치에 두 번 그리기
-      g.select('text.event-label')
-        .attr('x', xoff).attr('y', yoff)
-        .text(ev.label);
-      g.select('text.event-label-foreground')
-        .attr('x', xoff).attr('y', yoff)
-        .text(ev.label);
-
-      // bbox로 배경 rect 크기 계산
-      var bbox = g.select('text.event-label-foreground').node().getBBox();
+      var pad = 4, xoff = 8, yoff = 10;
+      var t = g.select('text.event-label').attr('x', xoff).attr('y', yoff).text(d.label);
+      var box = t.node().getBBox();
       g.select('rect.event-label-bg')
-        .attr('x', bbox.x - padding)
-        .attr('y', bbox.y - padding)
-        .attr('width',  bbox.width  + padding*2)
-        .attr('height', bbox.height + padding*2);
+        .attr('x', box.x - pad)
+        .attr('y', box.y - pad)
+        .attr('width',  box.width  + pad*2)
+        .attr('height', box.height + pad*2);
+      anchors[i].width = box.width + pad*2 + xoff; // 좌우 여유 포함
+    });
+
+    // 3) 좌→우로 훑으며 겹침 방지 오프셋 적용(단순 선형 보정)
+    anchors.sort(function(a,b){ return a.x - b.x; });
+    var lastRight = -Infinity;
+    for (var i=0;i<anchors.length;i++){
+      var left  = anchors[i].x + 8;                // 세로선에서 살짝 오른쪽
+      var right = left + anchors[i].width;
+      if (left < lastRight + 6){                   // 최소 간격 6px
+        var shift = (lastRight + 6) - left;
+        left  += shift; right += shift;
+      }
+      anchors[i].xFinal = left;
+      lastRight = right;
+    }
+
+    // 4) 최종 위치 반영
+    evG.each(function(d, i){
+      var g = d3.select(this);
+      var tx = anchors.find(function(a){ return a.d === d; }).xFinal;
+      var t  = g.select('text.event-label').attr('x', tx);
+      var box= t.node().getBBox();
+      g.select('rect.event-label-bg')
+        .attr('x', box.x - 4)
+        .attr('y', box.y - 4)
+        .attr('width',  box.width  + 8)
+        .attr('height', box.height + 8);
     });
   }
 
-  // 유틸: 날짜 → day
+  /* 유틸: 날짜→day */
   function dayFromRelease(iso, game){
     var t = (new Date(iso) - releaseDates[game]) / (1000*60*60*24);
     return Math.floor(t);
   }
-
 }).catch(function(err){
   console.error('load error:', err);
 });
