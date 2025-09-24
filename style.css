@@ -68,3 +68,14 @@ h1 {
     margin-right: 8px;
     border-radius: 3px;
 }
+.focus-line {
+  stroke: #888;
+  stroke-width: 1px;
+  stroke-dasharray: 3, 3;
+}
+
+.focus-circle {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+}
