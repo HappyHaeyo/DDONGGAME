@@ -1,6 +1,6 @@
 'use strict';
 
-/* ===== 사이즈/레이어 ===== */
+/* ===== 크기/레이어 ===== */
 var margin = { top: 40, right: 30, bottom: 55, left: 80 };
 var width  = 1200 - margin.left - margin.right;
 var height = 600  - margin.top  - margin.bottom;
@@ -11,6 +11,7 @@ var root = d3.select('#area-chart')
 
 var svg = root.append('g').attr('transform','translate('+margin.left+','+margin.top+')');
 
+/* ===== 색상 ===== */
 var COLOR = {
   wildsFill:  getComputedStyle(document.documentElement).getPropertyValue('--wilds-fill').trim()  || '#E69F00',
   wildsLine:  getComputedStyle(document.documentElement).getPropertyValue('--wilds-stroke').trim()|| '#955E00',
@@ -18,12 +19,16 @@ var COLOR = {
   worldLine:  getComputedStyle(document.documentElement).getPropertyValue('--world-stroke').trim()|| '#2F6E8E'
 };
 
-/* ===== 데이터 ===== */
+/* ===== 데이터 경로 ===== */
 var wildsPath = 'data/wilds_data.csv';
 var worldPath = 'data/world_data.csv';
 
+/* ===== 출시일 ===== */
 var releaseDates = { world: new Date('2018-08-09'), wilds: new Date('2025-02-28') };
+
+/* ===== 이벤트(월드=파랑, 와일즈=노랑) ===== */
 var events = [
+  // World (blue)
   { date: '2018-09-06', label: 'PC 최적화 패치', game: 'world' },
   { date: '2020-01-09', label: '아이스본 출시',   game: 'world' },
   { date: '2018-09-06', label: '타이틀 업데이트: 추가 몬스터 「공폭룡 이블조」', game: 'world' },
@@ -45,15 +50,26 @@ var events = [
   { date: '2020-03-28', label: '세리에나 축제 【만복 특집】', game: 'world' }
 ];
 
+// Wilds (yellow)
+events = events.concat([
+  { date: '2025-04-04', label: '무료 타이틀 업데이트 타마미츠네',       game: 'wilds' },
+  { date: '2025-04-30', label: '「역전왕 레 다우」 등장!',             game: 'wilds' },
+  { date: '2025-05-28', label: 'Street Fighter 6 스페셜 콜라보',        game: 'wilds' },
+  { date: '2025-06-30', label: '라기아크루스/ 셀레기오스 업데이트',      game: 'wilds' },
+  { date: '2025-07-23', label: '계절 이벤트 「교류 축제【용화 의식】」', game: 'wilds' },
+  { date: '2025-08-27', label: 'Fender 스페셜 콜라보',                  game: 'wilds' },
+  { date: '2025-09-24', label: '파이널 판타지 콜라보 예정',             game: 'wilds' }
+]);
+
 /* ===== 스케일/상태 ===== */
 var minY = 1000;
-var x0 = d3.scaleLinear().range([0, width]); // 원본 x (줌 기준)
+var x0 = d3.scaleLinear().range([0, width]); // 원본 x
 var x  = x0.copy();
-var y; // y는 모드에 따라 달라짐
-var scaleMode = 'log'; // 'log' | 'relative'
+var y;                                        // y는 모드에 따라 달라짐
+var scaleMode = 'log';                        // 'log' | 'relative'
 
-/* ===== 레이어 순서 (언더레이가 가장 아래) ===== */
-var underlay = svg.append('rect') // 이벤트/툴팁/줌을 모두 여기에서 받음 (별 위에 겹치지 않게 가장 아래)
+/* ===== 레이어 ===== */
+var underlay = svg.append('rect')  // 이벤트/툴팁/줌을 받는 바닥 레이어
   .attr('width', width).attr('height', height)
   .style('fill','none').style('pointer-events','all');
 
@@ -62,8 +78,8 @@ defs.append('clipPath').attr('id','clip').append('rect').attr('width',width).att
 
 var areaLayer  = svg.append('g').attr('clip-path','url(#clip)');
 var lineLayer  = svg.append('g').attr('clip-path','url(#clip)');
-var eventLayer = svg.append('g');  // 별은 오버레이 위로 보이게
-var uiLayer    = svg.append('g');  // 포커스/가이드라인
+var eventLayer = svg.append('g');
+var uiLayer    = svg.append('g');
 
 /* ===== 축 ===== */
 var xAxisG = svg.append('g').attr('transform','translate(0,'+height+')');
@@ -82,7 +98,7 @@ var dotWorld = focus.append('circle').attr('r',4).attr('class','focus-circle');
 var dotWilds = focus.append('circle').attr('r',4).attr('class','focus-circle');
 var diffLine = focus.append('line').attr('class','focus-diff');
 
-var evHoverLine = uiLayer.append('line') // 이벤트별 호버 라인
+var evHoverLine = uiLayer.append('line') // 이벤트 호버 라인
   .attr('class','event-hover-line')
   .attr('y1',0).attr('y2',height)
   .style('opacity',0);
@@ -148,17 +164,15 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
   var worldLine = lineLayer.append('path').datum(world)
     .attr('fill','none').attr('stroke',COLOR.worldLine).attr('stroke-width',1.4);
 
-  /* ===== 이벤트 별(월드는 파란색) ===== */
+  /* ===== 이벤트 원본 → 픽셀 최소간격 필터 ===== */
   var evRaw = events.map(function(ev){
     return { x: dayFromRelease(ev.date, ev.game), date: ev.date, label: ev.label, game: ev.game };
   }).filter(function(e){ return e.x>=0 && e.x<=maxDays; })
     .sort(function(a,b){ return a.x-b.x; });
 
-  // 별 과밀 제거: 화면상의 최소 간격(px)
-  var MIN_GAP = 28;
+  var MIN_GAP = 28; // px
   function filterEventsByGap(){
-    var keep = [];
-    var lastX = -Infinity;
+    var keep = [], lastX = -Infinity;
     evRaw.forEach(function(e){
       var px = x(e.x);
       if (px - lastX >= MIN_GAP){ keep.push(e); lastX = px; }
@@ -166,13 +180,13 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
     return keep;
   }
 
-  var starSize = 90; // 보기 좋은 크기
-  var starsSel = eventLayer.selectAll('.ev'); // selection 핸들
+  var starSize = 90;
+  var starsSel = eventLayer.selectAll('.ev');
 
   /* ===== 렌더 ===== */
   render();
 
-  /* ===== 컨트롤 ===== */
+  /* ===== 컨트롤(스케일 전환) ===== */
   d3.selectAll('#controls button').on('click', function(){
     d3.selectAll('#controls button').classed('active', false);
     d3.select(this).classed('active', true);
@@ -181,7 +195,7 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
     render();
   });
 
-  /* ===== 배경(언더레이)에서 툴팁/크로스헤어 ===== */
+  /* ===== 언더레이에서 크로스헤어/툴팁 ===== */
   var bisect = d3.bisector(function(d){ return d.days; }).left;
   underlay
     .on('mouseover', function(){ focus.style('opacity',1); tooltip.style('opacity',1); })
@@ -223,7 +237,7 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
         .style('left',(event.pageX+14)+'px')
         .style('top', (event.pageY-28)+'px');
     })
-    .on('click', function(){ // 배경 클릭 → 고정 툴팁 해제
+    .on('click', function(){ // 배경 클릭 → 이벤트 핀 해제
       pinned = null;
       evHoverLine.style('opacity',0);
       tooltip.style('opacity',0);
@@ -237,7 +251,7 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
     .on('zoom', function(event){ x = event.transform.rescaleX(x0); render(); });
   root.call(zoom);
 
-  /* ===== 고정 툴팁 핀 상태 ===== */
+  /* ===== 이벤트 핀 상태 ===== */
   var pinned = null;
 
   function render(){
@@ -252,24 +266,19 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
     wildsArea.attr('d', areaGenFor('wilds'));  wildsLine.attr('d', lineGenFor('wilds'));
     worldArea.attr('d', areaGenFor('world'));  worldLine.attr('d', lineGenFor('world'));
 
-    // 별은 최소 간격 필터를 적용해 그리기(줌마다 갱신)
+    // 별: 최소 간격 필터 적용하여 표시(줌 시 갱신)
     var evFiltered = filterEventsByGap();
     starsSel = eventLayer.selectAll('.ev').data(evFiltered, function(d){ return d.date+'|'+d.label; });
+
     var starsEnter = starsSel.enter().append('g').attr('class','ev');
     starsEnter.append('path')
       .attr('class','event-star')
       .attr('d', d3.symbol().type(d3.symbolStar).size(starSize))
       .attr('fill', function(d){ return d.game==='world'?COLOR.worldFill:COLOR.wildsFill; })
       .attr('stroke','#fff').attr('stroke-width',1.2)
-      .on('mouseover', function(event, d){
-        showEvent(d, event.pageX, event.pageY);
-      })
-      .on('mousemove', function(event, d){
-        showEvent(d, event.pageX, event.pageY);
-      })
-      .on('mouseout', function(){
-        if(!pinned){ evHoverLine.style('opacity',0); tooltip.style('opacity',0); }
-      })
+      .on('mouseover', function(event, d){ showEvent(d, event.pageX, event.pageY); })
+      .on('mousemove', function(event, d){ showEvent(d, event.pageX, event.pageY); })
+      .on('mouseout', function(){ if(!pinned){ evHoverLine.style('opacity',0); tooltip.style('opacity',0); } })
       .on('click', function(event, d){
         pinned = d;
         showEvent(d, event.pageX, event.pageY);
@@ -281,29 +290,30 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
 
     starsSel.exit().remove();
 
-    // 핀 고정 상태면 라인 위치 유지
+    // 핀 상태면 라인 유지
     if(pinned){
       evHoverLine
         .attr('x1', x(pinned.x)).attr('x2', x(pinned.x))
         .attr('y1', 0).attr('y2', height)
-        .attr('stroke', COLOR.worldLine)
+        .attr('stroke', pinned.game==='world'?COLOR.worldLine:COLOR.wildsLine)
         .style('opacity',1);
     }
   }
 
   function showEvent(d, pageX, pageY){
+    var color = d.game==='world'?COLOR.worldLine:COLOR.wildsLine;
+    var name  = d.game==='world'?'World':'Wilds';
     evHoverLine
       .attr('x1', x(d.x)).attr('x2', x(d.x))
       .attr('y1', 0).attr('y2', height)
-      .attr('stroke', d.game==='world'?COLOR.worldLine:COLOR.wildsLine)
-      .style('opacity',1);
-
-    var html = '<strong>'+d.date+'</strong><br/>'+
-               '<span style="color:'+COLOR.worldLine+'">World</span> · '+d.label;
+      .attr('stroke', color)
+      .style('opacity', 1);
+    var html = '<strong>'+d.date+'</strong><br/>' +
+               '<span style="color:'+color+'">'+name+'</span> · '+d.label;
     tooltip.html(html)
-      .style('left',(pageX+12)+'px')
-      .style('top', (pageY-24)+'px')
-      .style('opacity',1);
+      .style('left', (pageX + 12) + 'px')
+      .style('top',  (pageY - 24) + 'px')
+      .style('opacity', 1);
   }
 
   function dayFromRelease(iso, game){
