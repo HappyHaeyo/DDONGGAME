@@ -13,7 +13,7 @@ const svg = d3.select("#area-chart")
 // 3. 툴팁 div 생성
 const tooltip = d3.select("body").append("div").attr("class", "tooltip");
 
-// 데이터 경로, 출시일, 이벤트 데이터
+// ... (데이터 경로, 출시일, 이벤트 데이터는 이전과 동일) ...
 const worldDataPath = 'data/world_data.csv';
 const wildsDataPath = 'data/wilds_data.csv';
 const releaseDates = {
@@ -39,39 +39,40 @@ Promise.all([
     worldData.forEach(parseData);
     wildsData.forEach(parseData);
     
+    // 6. X, Y축 스케일 설정
     const maxDays = Math.max(d3.max(worldData, d => d.days), d3.max(wildsData, d => d.days));
     const maxPlayers = Math.max(d3.max(worldData, d => d.players), d3.max(wildsData, d => d.players));
     const xScale = d3.scaleLinear().domain([0, maxDays]).range([0, width]);
-    
-    // ✅ 변경점 1: Y축 최솟값을 1,000으로 낮추고, clamp(true) 안전장치를 추가했습니다.
-    const yScale = d3.scaleLog()
-        .domain([1000, maxPlayers])
-        .range([height, 0])
-        .clamp(true); // 범위를 벗어난 값이 들어와도 그래프가 깨지지 않게 함
+    const yScale = d3.scaleLog().domain([10000, maxPlayers]).range([height, 0]);
 
-    // 축 생성
+    // 7. 축 생성 (이전과 동일)
     svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(xScale)).append("text").attr("x", width / 2).attr("y", 40).attr("fill", "#000").attr("font-weight", "bold").text("출시 후 경과일 (Days after release)");
     svg.append("g").call(d3.axisLeft(yScale).ticks(5, d => (d >= 1000000 ? `${d / 1000000}M` : `${d / 1000}k`))).append("text").attr("transform", "rotate(-90)").attr("y", -50).attr("x", -height / 2).attr("fill", "#000").attr("font-weight", "bold").attr("text-anchor", "middle").text("동시 접속자 수 (로그 스케일)");
 
     // 8. 영역(Area) 생성기
     const areaGenerator = d3.area()
         .x(d => xScale(d.days))
+        // 변경점 1: 영역의 바닥을 차트의 맨 아래로 수정 (오류 해결)
         .y0(height) 
         .y1(d => yScale(d.players))
-        .curve(d3.curveMonotoneX)
-        // ✅ 변경점 2: 유효 데이터 기준을 1,000명으로 낮췄습니다.
-        .defined(d => d.players >= 1000);
+        .curve(d3.curveMonotoneX);
 
-    // 영역 그리기
+    // 영역 그리기 (이전과 동일)
     svg.append("path").datum(worldData).attr("fill", "#405d7b").attr("opacity", 0.7).attr("d", areaGenerator);
     svg.append("path").datum(wildsData).attr("fill", "#d95f02").attr("opacity", 0.7).attr("d", areaGenerator);
     
-    // 통합 툴팁 기능
+    // 이벤트 마커 (이전과 동일)
+    // ...
+
+    // --- 변경점 2: 새로운 통합 툴팁 기능 추가 ---
+
+    // 1. 툴팁 구성요소 생성 (세로선, 포커스 원 2개)
     const focus = svg.append("g").style("opacity", 0);
     focus.append("line").attr("class", "focus-line").attr("y1", 0).attr("y2", height);
     const worldCircle = focus.append("circle").attr("r", 5).attr("class", "focus-circle");
     const wildsCircle = focus.append("circle").attr("r", 5).attr("class", "focus-circle");
 
+    // 2. 마우스 움직임을 감지할 투명 사각형 추가
     svg.append("rect")
         .attr("class", "listening-rect")
         .attr("width", width)
@@ -85,31 +86,32 @@ Promise.all([
     const bisectDate = d3.bisector(d => d.days).left;
 
     function mousemove(event) {
-        const x0 = xScale.invert(d3.pointer(event)[0]);
+        const x0 = xScale.invert(d3.pointer(event)[0]); // 마우스 위치를 day 값으로 변환
         const i_world = bisectDate(worldData, x0, 1);
         const i_wilds = bisectDate(wildsData, x0, 1);
         const d_world = worldData[i_world];
         const d_wilds = wildsData[i_wilds];
         
-        if (!d_world || !d_wilds) return;
-
+        // 두 데이터 중 마우스 위치에 더 가까운 'day'를 기준으로 툴팁 위치 결정
         const anchorDay = (Math.abs(d_world.days - x0) < Math.abs(d_wilds.days - x0)) ? d_world.days : d_wilds.days;
 
+        // 3. 세로선과 포커스 원 위치 업데이트
         focus.attr("transform", `translate(${xScale(anchorDay)},0)`);
 
-        // ✅ 변경점 3: 툴팁 포커스 원의 기준도 1,000명으로 낮췄습니다.
-        if (d_world && d_world.players >= 1000) {
+        // 각 데이터의 y값이 유효할 때만 원 표시
+        if (d_world && d_world.players >= 10000) {
             worldCircle.attr("cy", yScale(d_world.players)).style("opacity", 1);
         } else {
             worldCircle.style("opacity", 0);
         }
         
-        if (d_wilds && d_wilds.players >= 1000) {
+        if (d_wilds && d_wilds.players >= 10000) {
             wildsCircle.attr("cy", yScale(d_wilds.players)).style("opacity", 1);
         } else {
             wildsCircle.style("opacity", 0);
         }
 
+        // 4. 툴팁 내용 업데이트 및 위치 조정
         tooltip.html(
             `<strong>Day ${anchorDay}</strong><br/>
              <span style="color:#69b3a2;">World:</span> ${d_world ? d_world.players.toLocaleString() : 'N/A'}<br/>
@@ -118,7 +120,6 @@ Promise.all([
         .style("left", (event.pageX + 15) + "px")
         .style("top", (event.pageY - 28) + "px");
     }
-
 }).catch(error => {
     console.error("데이터 로딩/처리 중 오류 발생:", error);
 });
