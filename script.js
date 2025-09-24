@@ -1,125 +1,209 @@
-// 1. 차트 기본 설정
-const margin = { top: 40, right: 30, bottom: 50, left: 70 };
+// 1) 차트 기본 설정
+const margin = { top: 40, right: 30, bottom: 55, left: 80 };
 const width = 1200 - margin.left - margin.right;
 const height = 600 - margin.top - margin.bottom;
 
-// 2. SVG 요소 설정
+// 2) SVG
 const svg = d3.select("#area-chart")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", height + margin.top + margin.bottom)
   .append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
+  .attr("transform", `translate(${margin.left},${margin.top})`);
 
-// 3. 툴팁 div 생성
+// 3) Tooltip
 const tooltip = d3.select("body").append("div").attr("class", "tooltip");
 
-// ... (데이터 경로, 출시일, 이벤트 데이터는 이전과 동일) ...
-const worldDataPath = 'data/world_data.csv';
-const wildsDataPath = 'data/wilds_data.csv';
+// 4) 데이터 경로/출시일/이벤트
+const worldDataPath = "data/world_data.csv";
+const wildsDataPath = "data/wilds_data.csv";
+
 const releaseDates = {
-    world: new Date("2018-08-09"),
-    wilds: new Date("2025-02-28")
+  world: new Date("2018-08-09"),
+  wilds: new Date("2025-02-28"),
 };
+
 const events = [
-    { date: "2018-09-06", label: "PC 최적화 패치", game: "world" },
-    { date: "2020-01-09", label: "아이스본 출시", game: "world" },
+  { date: "2018-09-06", label: "PC 최적화 패치", game: "world" },
+  { date: "2020-01-09", label: "아이스본 출시", game: "world" },
+  // 필요시 Wilds 이벤트를 여기에 추가
 ];
 
-// 5. 데이터 로드 및 차트 그리기
-Promise.all([
-    d3.csv(worldDataPath),
-    d3.csv(wildsDataPath)
-]).then(([worldData, wildsData]) => {
-    
-    const parseData = d => {
-        d.days = +d.days;
-        d.players = +d.players;
-        return d;
-    };
-    worldData.forEach(parseData);
-    wildsData.forEach(parseData);
-    
-    // 6. X, Y축 스케일 설정
-    const maxDays = Math.max(d3.max(worldData, d => d.days), d3.max(wildsData, d => d.days));
-    const maxPlayers = Math.max(d3.max(worldData, d => d.players), d3.max(wildsData, d => d.players));
-    const xScale = d3.scaleLinear().domain([0, maxDays]).range([0, width]);
-    const yScale = d3.scaleLog().domain([10000, maxPlayers]).range([height, 0]);
+// 5) 데이터 로드
+Promise.all([d3.csv(worldDataPath), d3.csv(wildsDataPath)]).then(([worldData, wildsData]) => {
+  // 파싱 & 정렬: ★ 가장 중요
+  const parse = (d) => ({ days: +d.days, players: +d.players });
+  worldData = worldData.map(parse).filter(d => Number.isFinite(d.days) && Number.isFinite(d.players));
+  wildsData = wildsData.map(parse).filter(d => Number.isFinite(d.days) && Number.isFinite(d.players));
 
-    // 7. 축 생성 (이전과 동일)
-    svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(xScale)).append("text").attr("x", width / 2).attr("y", 40).attr("fill", "#000").attr("font-weight", "bold").text("출시 후 경과일 (Days after release)");
-    svg.append("g").call(d3.axisLeft(yScale).ticks(5, d => (d >= 1000000 ? `${d / 1000000}M` : `${d / 1000}k`))).append("text").attr("transform", "rotate(-90)").attr("y", -50).attr("x", -height / 2).attr("fill", "#000").attr("font-weight", "bold").attr("text-anchor", "middle").text("동시 접속자 수 (로그 스케일)");
+  worldData.sort((a, b) => a.days - b.days);
+  wildsData.sort((a, b) => a.days - b.days);
 
-    // 8. 영역(Area) 생성기
-    const areaGenerator = d3.area()
-        .x(d => xScale(d.days))
-        // 변경점 1: 영역의 바닥을 차트의 맨 아래로 수정 (오류 해결)
-        .y0(height) 
-        .y1(d => yScale(d.players))
-        .curve(d3.curveMonotoneX);
+  // 6) 스케일
+  const maxDays = Math.max(
+    d3.max(worldData, d => d.days) ?? 0,
+    d3.max(wildsData, d => d.days) ?? 0
+  );
 
-    // 영역 그리기 (이전과 동일)
-    svg.append("path").datum(worldData).attr("fill", "#405d7b").attr("opacity", 0.7).attr("d", areaGenerator);
-    svg.append("path").datum(wildsData).attr("fill", "#d95f02").attr("opacity", 0.7).attr("d", areaGenerator);
-    
-    // 이벤트 마커 (이전과 동일)
-    // ...
+  const maxPlayers = Math.max(
+    d3.max(worldData, d => d.players) ?? 1,
+    d3.max(wildsData, d => d.players) ?? 1
+  );
 
-    // --- 변경점 2: 새로운 통합 툴팁 기능 추가 ---
+  const x = d3.scaleLinear().domain([0, maxDays]).range([0, width]);
+  const y = d3.scaleLog()
+    .domain([Math.max(1, Math.min(1000, maxPlayers / 1000)), maxPlayers]) // 최소값 안전 처리
+    .range([height, 0])
+    .clamp(true);
 
-    // 1. 툴팁 구성요소 생성 (세로선, 포커스 원 2개)
-    const focus = svg.append("g").style("opacity", 0);
-    focus.append("line").attr("class", "focus-line").attr("y1", 0).attr("y2", height);
-    const worldCircle = focus.append("circle").attr("r", 5).attr("class", "focus-circle");
-    const wildsCircle = focus.append("circle").attr("r", 5).attr("class", "focus-circle");
+  // 7) 축
+  svg.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x))
+    .append("text")
+    .attr("x", width / 2)
+    .attr("y", 45)
+    .attr("fill", "#000")
+    .attr("font-weight", "bold")
+    .attr("text-anchor", "middle")
+    .text("출시 후 경과일 (Days after release)");
 
-    // 2. 마우스 움직임을 감지할 투명 사각형 추가
-    svg.append("rect")
-        .attr("class", "listening-rect")
-        .attr("width", width)
-        .attr("height", height)
-        .style("fill", "none")
-        .style("pointer-events", "all")
-        .on("mouseover", () => { focus.style("opacity", 1); tooltip.style("opacity", 1); })
-        .on("mouseout", () => { focus.style("opacity", 0); tooltip.style("opacity", 0); })
-        .on("mousemove", mousemove);
+  svg.append("g")
+    .call(
+      d3.axisLeft(y)
+        .ticks(6, d => (d >= 1_000_000 ? `${d / 1_000_000}M` : `${d / 1000}k`))
+    )
+    .append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("x", -height / 2)
+    .attr("y", -60)
+    .attr("fill", "#000")
+    .attr("font-weight", "bold")
+    .attr("text-anchor", "middle")
+    .text("동시 접속자 수 (로그 스케일)");
 
-    const bisectDate = d3.bisector(d => d.days).left;
+  // 8) Area & Line 생성기
+  const definedThreshold = 1; // log 스케일 하한을 이미 clamp 했으므로 1로 완화
+  const area = d3.area()
+    .x(d => x(d.days))
+    .y0(height)
+    .y1(d => y(Math.max(definedThreshold, d.players)))
+    .curve(d3.curveMonotoneX)
+    .defined(d => d.players >= definedThreshold);
 
-    function mousemove(event) {
-        const x0 = xScale.invert(d3.pointer(event)[0]); // 마우스 위치를 day 값으로 변환
-        const i_world = bisectDate(worldData, x0, 1);
-        const i_wilds = bisectDate(wildsData, x0, 1);
-        const d_world = worldData[i_world];
-        const d_wilds = wildsData[i_wilds];
-        
-        // 두 데이터 중 마우스 위치에 더 가까운 'day'를 기준으로 툴팁 위치 결정
-        const anchorDay = (Math.abs(d_world.days - x0) < Math.abs(d_wilds.days - x0)) ? d_world.days : d_wilds.days;
+  const line = d3.line()
+    .x(d => x(d.days))
+    .y(d => y(Math.max(definedThreshold, d.players)))
+    .curve(d3.curveMonotoneX)
+    .defined(d => d.players >= definedThreshold);
 
-        // 3. 세로선과 포커스 원 위치 업데이트
-        focus.attr("transform", `translate(${xScale(anchorDay)},0)`);
+  // 9) 영역 + 선 (World → Wilds 순서로 겹침)
+  svg.append("path")
+    .datum(worldData)
+    .attr("fill", "#405d7b")
+    .attr("opacity", 0.7)
+    .attr("d", area);
 
-        // 각 데이터의 y값이 유효할 때만 원 표시
-        if (d_world && d_world.players >= 10000) {
-            worldCircle.attr("cy", yScale(d_world.players)).style("opacity", 1);
-        } else {
-            worldCircle.style("opacity", 0);
-        }
-        
-        if (d_wilds && d_wilds.players >= 10000) {
-            wildsCircle.attr("cy", yScale(d_wilds.players)).style("opacity", 1);
-        } else {
-            wildsCircle.style("opacity", 0);
-        }
+  svg.append("path")
+    .datum(worldData)
+    .attr("fill", "none")
+    .attr("stroke", "#2c3e50")
+    .attr("stroke-width", 1.5)
+    .attr("d", line);
 
-        // 4. 툴팁 내용 업데이트 및 위치 조정
-        tooltip.html(
-            `<strong>Day ${anchorDay}</strong><br/>
-             <span style="color:#69b3a2;">World:</span> ${d_world ? d_world.players.toLocaleString() : 'N/A'}<br/>
-             <span style="color:#ff8c00;">Wilds:</span> ${d_wilds ? d_wilds.players.toLocaleString() : 'N/A'}`
-        )
-        .style("left", (event.pageX + 15) + "px")
-        .style("top", (event.pageY - 28) + "px");
-    }
-}).catch(error => {
-    console.error("데이터 로딩/처리 중 오류 발생:", error);
+  svg.append("path")
+    .datum(wildsData)
+    .attr("fill", "#d95f02")
+    .attr("opacity", 0.6)
+    .attr("d", area);
+
+  svg.append("path")
+    .datum(wildsData)
+    .attr("fill", "none")
+    .attr("stroke", "#9a3f00")
+    .attr("stroke-width", 1.5)
+    .attr("d", line);
+
+  // 10) 이벤트 주석 (출시일 기준 day 계산 후, 범위 내만 표시)
+  const dayFromRelease = (iso, game) => {
+    const t = (new Date(iso) - releaseDates[game]) / (1000 * 60 * 60 * 24);
+    return Math.floor(t);
+  };
+
+  events.forEach(ev => {
+    const dday = dayFromRelease(ev.date, ev.game);
+    if (dday < 0 || dday > maxDays) return; // 범위 밖이면 스킵
+    const xx = x(dday);
+
+    svg.append("line")
+      .attr("class", "event-line")
+      .attr("x1", xx).attr("x2", xx)
+      .attr("y1", 0).attr("y2", height);
+
+    svg.append("text")
+      .attr("class", "event-label")
+      .attr("x", xx)
+      .attr("y", 12)
+      .text(ev.label)
+      .attr("transform", `translate(0,0)`)
+      .attr("text-anchor", "start")
+      .attr("dx", 6);
+  });
+
+  // 11) 통합 툴팁 (경계 보정)
+  const focus = svg.append("g").style("opacity", 0);
+  focus.append("line").attr("class", "focus-line").attr("y1", 0).attr("y2", height);
+  const worldDot = focus.append("circle").attr("r", 4).attr("class", "focus-circle");
+  const wildsDot = focus.append("circle").attr("r", 4).attr("class", "focus-circle");
+
+  const bisect = d3.bisector(d => d.days).left;
+
+  svg.append("rect")
+    .attr("class", "listening-rect")
+    .attr("width", width)
+    .attr("height", height)
+    .style("fill", "none")
+    .style("pointer-events", "all")
+    .on("mouseover", () => { focus.style("opacity", 1); tooltip.style("opacity", 1); })
+    .on("mouseout", () => { focus.style("opacity", 0); tooltip.style("opacity", 0); })
+    .on("mousemove", (event) => {
+      const mouseX = d3.pointer(event)[0];
+      const xDay = x.invert(mouseX);
+
+      // 각 시리즈에서 가장 가까운 점 찾기 (경계 보정)
+      const pick = (arr) => {
+        let i = Math.max(1, Math.min(arr.length - 1, bisect(arr, xDay)));
+        const a0 = arr[i - 1], a1 = arr[i];
+        if (!a0 || !a1) return a0 || a1;
+        return (xDay - a0.days) < (a1.days - xDay) ? a0 : a1;
+      };
+
+      const pw = worldData.length ? pick(worldData) : null;
+      const pz = wildsData.length ? pick(wildsData) : null;
+      if (!pw && !pz) return;
+
+      const anchor = (pw && pz)
+        ? (Math.abs(pw.days - xDay) <= Math.abs(pz.days - xDay) ? pw.days : pz.days)
+        : (pw ? pw.days : pz.days);
+
+      focus.attr("transform", `translate(${x(anchor)},0)`);
+
+      if (pw) {
+        worldDot.style("opacity", 1).attr("cy", y(Math.max(definedThreshold, pw.players)));
+      } else worldDot.style("opacity", 0);
+
+      if (pz) {
+        wildsDot.style("opacity", 1).attr("cy", y(Math.max(definedThreshold, pz.players)));
+      } else wildsDot.style("opacity", 0);
+
+      tooltip.html(
+        `<strong>Day ${anchor}</strong><br/>
+         <span style="color:#405d7b">World:</span> ${pw ? pw.players.toLocaleString() : "N/A"}<br/>
+         <span style="color:#d95f02">Wilds:</span> ${pz ? pz.players.toLocaleString() : "N/A"}`
+      )
+      .style("left", (event.pageX + 14) + "px")
+      .style("top", (event.pageY - 28) + "px");
+    });
+
+}).catch(err => {
+  console.error("데이터 로딩/처리 오류:", err);
 });
