@@ -3,23 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CSV Area Chart</title>
+  <title>World vs Wilds — Area Chart</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <h1>Data Visualization: World vs Wilds</h1>
+
   <div id="chart-container">
     <svg id="area-chart"></svg>
   </div>
 
   <div id="legend">
     <div class="legend-item">
-      <span class="color-box" style="background:#d95f02"></span> MHW: Wilds
+      <span class="color-box" id="swatch-wilds"></span> MHW: Wilds
     </div>
     <div class="legend-item">
-      <span class="color-box" style="background:#405d7b"></span> MHW: World
+      <span class="color-box" id="swatch-world"></span> MHW: World
     </div>
   </div>
+
+  <details id="help" open>
+    <summary>사용 방법</summary>
+    <ul>
+      <li>휠로 <strong>줌</strong>, 드래그로 <strong>이동(팬)</strong></li>
+      <li>차트 안에서 <strong>더블클릭</strong> → 초기 보기로 리셋</li>
+      <li>세로 점선 + 다이아몬드 = <strong>주요 이벤트</strong>. 라벨은 겹치지 않도록 자동 간격 조정</li>
+      <li>Y축은 <strong>로그 스케일</strong>(k, M 표기)</li>
+    </ul>
+  </details>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="script.js"></script>
