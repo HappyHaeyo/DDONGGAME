@@ -17,19 +17,37 @@ var COLOR = {
   wildsFill:  getComputedStyle(document.documentElement).getPropertyValue('--wilds-fill').trim() || '#E69F00',
   wildsLine:  getComputedStyle(document.documentElement).getPropertyValue('--wilds-stroke').trim() || '#955E00',
   worldFill:  getComputedStyle(document.documentElement).getPropertyValue('--world-fill').trim() || '#56B4E9',
-  worldLine:  getComputedStyle(document.documentElement).getPropertyValue('--world-stroke').trim() || '#2F6E8E',
-  event:      getComputedStyle(document.documentElement).getPropertyValue('--event').trim() || '#D55E00'
+  worldLine:  getComputedStyle(document.documentElement).getPropertyValue('--world-stroke').trim() || '#2F6E8E'
 };
 
-/* 데이터 경로 (404가 뜨면 이 경로를 확인하세요) */
+/* 데이터 경로 */
 var wildsPath = 'data/wilds_data.csv';
 var worldPath = 'data/world_data.csv';
 
-/* 출시일 & 이벤트 */
+/* 출시일 & 이벤트(월드는 파란 마커) */
 var releaseDates = { world: new Date('2018-08-09'), wilds: new Date('2025-02-28') };
 var events = [
+  // 기존
   { date: '2018-09-06', label: 'PC 최적화 패치', game: 'world' },
-  { date: '2020-01-09', label: '아이스본 출시',   game: 'world' }
+  { date: '2020-01-09', label: '아이스본 출시',   game: 'world' },
+  // 제공해준 월드 이벤트들
+  { date: '2018-09-06', label: '타이틀 업데이트: 추가 몬스터 「공폭룡 이블조」', game: 'world' },
+  { date: '2018-10-05', label: "타이틀 업데이트: 아스테라 축제 '풍작 특집'", game: 'world' },
+  { date: '2018-10-19', label: '「록맨」 스페셜 콜라보', game: 'world' },
+  { date: '2018-11-02', label: '특별조사【맘-타로트】 시작', game: 'world' },
+  { date: '2018-11-16', label: '「Devil May Cry」 스페셜 콜라보', game: 'world' },
+  { date: '2018-11-22', label: '타이틀 업데이트: 【나나-테스카토리】 등장!', game: 'world' },
+  { date: '2018-11-30', label: '「역전왕」키린 / 아스테라 축제【반짝 특집】', game: 'world' },
+  { date: '2018-12-14', label: '「역전왕 발하자크」 Steam 첫 등장', game: 'world' },
+  { date: '2018-12-21', label: '파이널 판타지 베히모스 콜라보', game: 'world' },
+  { date: '2019-01-18', label: '이벤트 퀘스트 「극 베히모스 토벌전」', game: 'world' },
+  { date: '2019-01-26', label: '아스테라 축제 <감사의 연회>', game: 'world' },
+  { date: '2019-05-16', label: "「Assassin's Creed」 콜라보", game: 'world' },
+  { date: '2019-07-26', label: "기간 한정 이벤트 '아스테라 축제'", game: 'world' },
+  { date: '2019-12-06', label: 'Iceborne 예약 구매 시작', game: 'world' },
+  { date: '2020-01-09', label: 'MHW: Iceborne 발매', game: 'world' },
+  { date: '2020-02-06', label: '대형 타이틀 업데이트 제1탄', game: 'world' },
+  { date: '2020-03-28', label: '세리에나 축제 【만복 특집】', game: 'world' }
 ];
 
 /* 스케일/모드 */
@@ -63,8 +81,14 @@ focus.append('line').attr('class','focus-line').attr('y1',0).attr('y2',height);
 var dotWorld = focus.append('circle').attr('r',4).attr('class','focus-circle');
 var dotWilds = focus.append('circle').attr('r',4).attr('class','focus-circle');
 var diffLine = focus.append('line').attr('class','focus-diff');
-var overlay = uiLayer.append('rect').attr('width', width).attr('height', height)
+var overlay  = uiLayer.append('rect').attr('width', width).attr('height', height)
   .style('fill','none').style('pointer-events','all');
+
+/* 이벤트 hover용 세로 가이드라인(기본 숨김) */
+var evHoverLine = uiLayer.append('line')
+  .attr('class','event-hover-line')
+  .attr('y1',0).attr('y2',height)
+  .style('opacity',0);
 
 /* 값 계산 */
 var maxWorld = 1, maxWilds = 1;
@@ -131,19 +155,49 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
   var worldLine = lineLayer.append('path').datum(world)
     .attr('fill','none').attr('stroke', COLOR.worldLine).attr('stroke-width', 1.4);
 
-  /* 이벤트 */
-  var evData = events.map(function(ev){
-    return { x: dayFromRelease(ev.date, ev.game), label: ev.label };
-  }).filter(function(e){ return e.x >= 0 && e.x <= maxDays; })
+  /* ===== 이벤트: 별 아이콘 + hover 툴팁/세로선 ===== */
+  var evData = events
+    .map(function(ev){
+      return { x: dayFromRelease(ev.date, ev.game), date: ev.date, label: ev.label, game: ev.game };
+    })
+    .filter(function(e){ return e.x >= 0 && e.x <= maxDays; })
     .sort(function(a,b){ return a.x - b.x; });
-  var evG = eventLayer.selectAll('.ev').data(evData).enter().append('g').attr('class','ev');
-  evG.append('line').attr('class','event-line').attr('y1',0).attr('y2',height);
-  evG.append('path').attr('class','event-symbol')
-     .attr('d', d3.symbol().type(d3.symbolDiamond).size(72))
-     .attr('transform','translate(0,12)');
-  evG.append('rect').attr('class','event-label-bg');
-  evG.append('text').attr('class','event-label').attr('dy','0.35em');
 
+  var starSize = 110; // 필요시 조정
+  var evG = eventLayer.selectAll('.ev')
+    .data(evData).enter()
+    .append('g').attr('class','ev')
+    .attr('transform', function(d){ return 'translate(' + x(d.x) + ',0)'; });
+
+  evG.append('path')
+    .attr('class','event-star')
+    .attr('d', d3.symbol().type(d3.symbolStar).size(starSize))
+    .attr('transform','translate(0,12)')
+    .attr('fill', function(d){ return d.game === 'world' ? COLOR.worldFill : COLOR.wildsFill; })
+    .attr('stroke','#fff')
+    .attr('stroke-width',1.2)
+    .on('mouseover', function(event, d){
+      // 세로 가이드라인 색상
+      evHoverLine
+        .attr('x1', x(d.x)).attr('x2', x(d.x))
+        .attr('y1', 0).attr('y2', height)
+        .attr('stroke', d.game === 'world' ? COLOR.worldLine : COLOR.wildsLine)
+        .style('opacity', 1);
+
+      var html = '<strong>' + d.date + '</strong><br/>' +
+                 (d.game === 'world' ? '<span style="color:'+COLOR.worldLine+'">World</span>' : '<span style="color:'+COLOR.wildsLine+'">Wilds</span>') +
+                 ' · ' + d.label;
+      tooltip.html(html)
+        .style('left', (event.pageX + 12) + 'px')
+        .style('top',  (event.pageY - 24) + 'px')
+        .style('opacity', 1);
+    })
+    .on('mouseout', function(){
+      evHoverLine.style('opacity', 0);
+      tooltip.style('opacity', 0);
+    });
+
+  /* ===== 렌더 ===== */
   render();
 
   /* 스케일 전환 */
@@ -155,7 +209,7 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
     render();
   });
 
-  /* 툴팁/포커스 */
+  /* 툴팁/포커스(시리즈 비교) */
   var bisect = d3.bisector(function(d){ return d.days; }).left;
   overlay
     .on('mouseover', function(){ focus.style('opacity',1); tooltip.style('opacity',1); })
@@ -222,8 +276,6 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
   /* 렌더 */
   function render(){
     xAxisG.call(d3.axisBottom(x));
-
-    // ❗ 틱 포맷: 함수는 tickFormat으로 지정 (두 번째 인자로 주면 에러 발생)
     var yAxis = (scaleMode==='relative')
       ? d3.axisLeft(y).ticks(6).tickFormat(function(d){ return d + '%'; })
       : d3.axisLeft(y).ticks(6).tickFormat(function(d){
@@ -231,49 +283,18 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
         });
     yAxisG.call(yAxis);
 
-    areaLayer.selectAll('path').remove();
-    lineLayer.selectAll('path').remove();
+    wildsArea.attr('d', areaGenFor('wilds'));  wildsLine.attr('d', lineGenFor('wilds'));
+    worldArea.attr('d', areaGenFor('world'));  worldLine.attr('d', lineGenFor('world'));
 
-    areaLayer.append('path').datum(wilds).attr('fill', COLOR.wildsFill).attr('opacity', .7).attr('d', areaGenFor('wilds'));
-    lineLayer.append('path').datum(wilds).attr('fill','none').attr('stroke', COLOR.wildsLine).attr('stroke-width', 1.4).attr('d', lineGenFor('wilds'));
+    // 이벤트 별의 x 위치 업데이트
+    eventLayer.selectAll('.ev')
+      .attr('transform', function(d){ return 'translate(' + x(d.x) + ',0)'; });
 
-    areaLayer.append('path').datum(world).attr('fill', COLOR.worldFill).attr('opacity', .75).attr('d', areaGenFor('world'));
-    lineLayer.append('path').datum(world).attr('fill','none').attr('stroke', COLOR.worldLine).attr('stroke-width', 1.4).attr('d', lineGenFor('world'));
-
-    // 이벤트 위치 & 라벨(겹침 방지)
-    var evData = events.map(function(ev){ return { x: dayFromRelease(ev.date, ev.game), label: ev.label }; });
-    var evG = eventLayer.selectAll('.ev').data(evData);
-    evG.attr('transform', function(d){ return 'translate(' + x(d.x) + ',0)'; });
-    evG.select('line.event-line').attr('y2', height);
-
-    var anchors = evData.map(function(d){ return { x:x(d.x), width:0, d:d, xFinal:0 }; });
-    evG.each(function(d, i){
-      var g = d3.select(this);
-      var pad=4, xoff=8, yoff=10;
-      var t = g.select('text.event-label').attr('x', xoff).attr('y', yoff).text(d.label);
-      var box = t.node().getBBox();
-      g.select('rect.event-label-bg')
-        .attr('x', box.x - pad).attr('y', box.y - pad)
-        .attr('width', box.width + pad*2).attr('height', box.height + pad*2);
-      anchors[i].width = box.width + pad*2 + xoff;
-    });
-    anchors.sort(function(a,b){ return a.x - b.x; });
-    var lastRight = -Infinity;
-    for (var i=0;i<anchors.length;i++){
-      var left = anchors[i].x + 8;
-      var right = left + anchors[i].width;
-      if (left < lastRight + 6){ var shift = (lastRight + 6) - left; left += shift; right += shift; }
-      anchors[i].xFinal = left; lastRight = right;
+    // 현재 보여지는 evHoverLine이 있다면 x만 갱신
+    if (evHoverLine.style('opacity') === '1'){
+      // tooltip이 붙어있는 별의 x를 다시 계산할 수 없으니, 우선 라인만 범위에 맞게 유지
+      // (마우스를 살짝만 움직여도 다시 정확 위치로 맞춰짐)
     }
-    evG.each(function(d){
-      var g = d3.select(this);
-      var tx = anchors.find(function(a){ return a.d.x===d.x && a.d.label===d.label; }).xFinal;
-      var t  = g.select('text.event-label').attr('x', tx);
-      var box= t.node().getBBox();
-      g.select('rect.event-label-bg')
-        .attr('x', box.x - 4).attr('y', box.y - 4)
-        .attr('width', box.width + 8).attr('height', box.height + 8);
-    });
   }
 
   function dayFromRelease(iso, game){
