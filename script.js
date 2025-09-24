@@ -21,7 +21,7 @@ var COLOR = {
   event:      getComputedStyle(document.documentElement).getPropertyValue('--event').trim() || '#D55E00'
 };
 
-/* 데이터 경로 */
+/* 데이터 경로 (404가 뜨면 이 경로를 확인하세요) */
 var wildsPath = 'data/wilds_data.csv';
 var worldPath = 'data/world_data.csv';
 
@@ -37,14 +37,12 @@ var minY = 1000;
 var x0 = d3.scaleLinear().range([0, width]); // 원본 x
 var x  = x0.copy();                           // 현재 x(줌 반영)
 var y;                                        // 현재 y(모드별)
-var scaleMode = 'log';                        // 'log' | 'symlog' | 'relative'
-var symlogK = 50000;                          // 심로그 상수(데이터 로드 후 동적 설정)
+var scaleMode = 'log';                        // 'log' | 'relative'
 
 /* 레이어 */
 var defs = svg.append('defs');
 defs.append('clipPath').attr('id', 'clip')
   .append('rect').attr('width', width).attr('height', height);
-
 var areaLayer  = svg.append('g').attr('clip-path','url(#clip)');
 var lineLayer  = svg.append('g').attr('clip-path','url(#clip)');
 var eventLayer = svg.append('g');
@@ -65,11 +63,10 @@ focus.append('line').attr('class','focus-line').attr('y1',0).attr('y2',height);
 var dotWorld = focus.append('circle').attr('r',4).attr('class','focus-circle');
 var dotWilds = focus.append('circle').attr('r',4).attr('class','focus-circle');
 var diffLine = focus.append('line').attr('class','focus-diff');
-
 var overlay = uiLayer.append('rect').attr('width', width).attr('height', height)
   .style('fill','none').style('pointer-events','all');
 
-/* y값 계산 */
+/* 값 계산 */
 var maxWorld = 1, maxWilds = 1;
 function yVal(series, v){
   if (scaleMode === 'relative'){
@@ -82,10 +79,6 @@ function yVal(series, v){
 function makeY(maxPlayers){
   if (scaleMode === 'log'){
     return d3.scaleLog().domain([minY, maxPlayers]).range([height,0]).clamp(true);
-  }
-  if (scaleMode === 'symlog'){
-    // 동적 상수로 저부 확대
-    return d3.scaleSymlog().constant(symlogK).domain([0, maxPlayers]).range([height,0]).clamp(true);
   }
   return d3.scaleLinear().domain([0,100]).range([height,0]).nice();
 }
@@ -126,26 +119,13 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
   maxWorld = d3.max(world, function(d){ return d.players; }) || 1;
   maxWilds = d3.max(wilds, function(d){ return d.players; }) || 1;
 
-  // ▼▼ 심로그 상수 동적 계산: 전체 값의 하위 40% 분위수 기반, 10k~200k 사이로 제한
-  var allVals = wilds.map(function(d){return d.players;})
-    .concat(world.map(function(d){return d.players;}))
-    .filter(function(v){return v>0;})
-    .sort(function(a,b){return a-b;});
-  var q40 = d3.quantileSorted(allVals, 0.40) || 10000;
-  symlogK = Math.max(10000, Math.min(200000, Math.round(q40)));
-  var btn = document.getElementById('btn-symlog');
-  if (btn) btn.textContent = '저부 확대(심로그, K≈' + Math.round(symlogK/1000) + 'k)';
-
-  x0.domain([0, maxDays]);
-  x.domain(x0.domain());
-  y = makeY(maxPlayers);
+  x0.domain([0, maxDays]); x.domain(x0.domain()); y = makeY(maxPlayers);
 
   /* path */
   var wildsArea = areaLayer.append('path').datum(wilds)
     .attr('fill', COLOR.wildsFill).attr('opacity', .7);
   var wildsLine = lineLayer.append('path').datum(wilds)
     .attr('fill','none').attr('stroke', COLOR.wildsLine).attr('stroke-width', 1.4);
-
   var worldArea = areaLayer.append('path').datum(world)
     .attr('fill', COLOR.worldFill).attr('opacity', .75);
   var worldLine = lineLayer.append('path').datum(world)
@@ -156,7 +136,6 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
     return { x: dayFromRelease(ev.date, ev.game), label: ev.label };
   }).filter(function(e){ return e.x >= 0 && e.x <= maxDays; })
     .sort(function(a,b){ return a.x - b.x; });
-
   var evG = eventLayer.selectAll('.ev').data(evData).enter().append('g').attr('class','ev');
   evG.append('line').attr('class','event-line').attr('y1',0).attr('y2',height);
   evG.append('path').attr('class','event-symbol')
@@ -243,13 +222,23 @@ Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
   /* 렌더 */
   function render(){
     xAxisG.call(d3.axisBottom(x));
+
+    // ❗ 틱 포맷: 함수는 tickFormat으로 지정 (두 번째 인자로 주면 에러 발생)
     var yAxis = (scaleMode==='relative')
-      ? d3.axisLeft(y).ticks(6).tickFormat(function(d){ return d+'%'; })
-      : d3.axisLeft(y).ticks(6, function(d){ return d>=1e6?(d/1e6)+'M':(d/1e3)+'k'; });
+      ? d3.axisLeft(y).ticks(6).tickFormat(function(d){ return d + '%'; })
+      : d3.axisLeft(y).ticks(6).tickFormat(function(d){
+          return d >= 1000000 ? (d/1000000)+'M' : (d/1000)+'k';
+        });
     yAxisG.call(yAxis);
 
-    wildsArea.attr('d', areaGenFor('wilds'));  wildsLine.attr('d', lineGenFor('wilds'));
-    worldArea.attr('d', areaGenFor('world'));  worldLine.attr('d', lineGenFor('world'));
+    areaLayer.selectAll('path').remove();
+    lineLayer.selectAll('path').remove();
+
+    areaLayer.append('path').datum(wilds).attr('fill', COLOR.wildsFill).attr('opacity', .7).attr('d', areaGenFor('wilds'));
+    lineLayer.append('path').datum(wilds).attr('fill','none').attr('stroke', COLOR.wildsLine).attr('stroke-width', 1.4).attr('d', lineGenFor('wilds'));
+
+    areaLayer.append('path').datum(world).attr('fill', COLOR.worldFill).attr('opacity', .75).attr('d', areaGenFor('world'));
+    lineLayer.append('path').datum(world).attr('fill','none').attr('stroke', COLOR.worldLine).attr('stroke-width', 1.4).attr('d', lineGenFor('world'));
 
     // 이벤트 위치 & 라벨(겹침 방지)
     var evData = events.map(function(ev){ return { x: dayFromRelease(ev.date, ev.game), label: ev.label }; });
