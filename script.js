@@ -101,3 +101,196 @@ function areaGenFor(series){
 function lineGenFor(series){
   return d3.line()
     .x(function(d){ return x(d.days); })
+    .y(function(d){ return y( yVal(series, d.players) ); })
+    .curve(d3.curveMonotoneX);
+}
+
+/* 데이터 로드 */
+Promise.all([ d3.csv(wildsPath), d3.csv(worldPath) ]).then(function(res){
+  var wilds = res[0].map(function(d){ return { days:+d.days, players:+d.players }; })
+                   .filter(function(d){ return isFinite(d.days) && isFinite(d.players); })
+                   .sort(function(a,b){ return a.days - b.days; });
+  var world = res[1].map(function(d){ return { days:+d.days, players:+d.players }; })
+                   .filter(function(d){ return isFinite(d.days) && isFinite(d.players); })
+                   .sort(function(a,b){ return a.days - b.days; });
+
+  var maxDays = Math.max(
+    d3.max(wilds, function(d){ return d.days; }) || 0,
+    d3.max(world, function(d){ return d.days; }) || 0
+  );
+  var maxPlayers = Math.max(
+    d3.max(wilds, function(d){ return d.players; }) || 1,
+    d3.max(world, function(d){ return d.players; }) || 1
+  );
+
+  maxWorld = d3.max(world, function(d){ return d.players; }) || 1;
+  maxWilds = d3.max(wilds, function(d){ return d.players; }) || 1;
+
+  // ▼▼ 심로그 상수 동적 계산: 전체 값의 하위 40% 분위수 기반, 10k~200k 사이로 제한
+  var allVals = wilds.map(function(d){return d.players;})
+    .concat(world.map(function(d){return d.players;}))
+    .filter(function(v){return v>0;})
+    .sort(function(a,b){return a-b;});
+  var q40 = d3.quantileSorted(allVals, 0.40) || 10000;
+  symlogK = Math.max(10000, Math.min(200000, Math.round(q40)));
+  var btn = document.getElementById('btn-symlog');
+  if (btn) btn.textContent = '저부 확대(심로그, K≈' + Math.round(symlogK/1000) + 'k)';
+
+  x0.domain([0, maxDays]);
+  x.domain(x0.domain());
+  y = makeY(maxPlayers);
+
+  /* path */
+  var wildsArea = areaLayer.append('path').datum(wilds)
+    .attr('fill', COLOR.wildsFill).attr('opacity', .7);
+  var wildsLine = lineLayer.append('path').datum(wilds)
+    .attr('fill','none').attr('stroke', COLOR.wildsLine).attr('stroke-width', 1.4);
+
+  var worldArea = areaLayer.append('path').datum(world)
+    .attr('fill', COLOR.worldFill).attr('opacity', .75);
+  var worldLine = lineLayer.append('path').datum(world)
+    .attr('fill','none').attr('stroke', COLOR.worldLine).attr('stroke-width', 1.4);
+
+  /* 이벤트 */
+  var evData = events.map(function(ev){
+    return { x: dayFromRelease(ev.date, ev.game), label: ev.label };
+  }).filter(function(e){ return e.x >= 0 && e.x <= maxDays; })
+    .sort(function(a,b){ return a.x - b.x; });
+
+  var evG = eventLayer.selectAll('.ev').data(evData).enter().append('g').attr('class','ev');
+  evG.append('line').attr('class','event-line').attr('y1',0).attr('y2',height);
+  evG.append('path').attr('class','event-symbol')
+     .attr('d', d3.symbol().type(d3.symbolDiamond).size(72))
+     .attr('transform','translate(0,12)');
+  evG.append('rect').attr('class','event-label-bg');
+  evG.append('text').attr('class','event-label').attr('dy','0.35em');
+
+  render();
+
+  /* 스케일 전환 */
+  d3.selectAll('#controls button').on('click', function(){
+    d3.selectAll('#controls button').classed('active', false);
+    d3.select(this).classed('active', true);
+    scaleMode = this.getAttribute('data-scale');
+    y = makeY(maxPlayers);
+    render();
+  });
+
+  /* 툴팁/포커스 */
+  var bisect = d3.bisector(function(d){ return d.days; }).left;
+  overlay
+    .on('mouseover', function(){ focus.style('opacity',1); tooltip.style('opacity',1); })
+    .on('mouseout',  function(){ focus.style('opacity',0); tooltip.style('opacity',0); })
+    .on('mousemove', function(event){
+      var mouseX = d3.pointer(event)[0];
+      var dayX   = x.invert(mouseX);
+
+      function pick(arr){
+        if (!arr.length) return null;
+        var i = Math.max(1, Math.min(arr.length - 1, bisect(arr, dayX)));
+        var a0 = arr[i-1], a1 = arr[i];
+        if (!a0 || !a1) return a0 || a1;
+        return (dayX - a0.days) < (a1.days - dayX) ? a0 : a1;
+      }
+      var pw = pick(world), pz = pick(wilds);
+      if (!pw && !pz) return;
+
+      var anchor = pw && pz ? (Math.abs(pw.days - dayX) <= Math.abs(pz.days - dayX) ? pw.days : pz.days)
+                            : (pw ? pw.days : pz.days);
+
+      var yW = pw ? y( yVal('world', pw.players) ) : null;
+      var yZ = pz ? y( yVal('wilds', pz.players) ) : null;
+
+      focus.attr('transform', 'translate(' + x(anchor) + ',0)');
+      if (pw) { dotWorld.style('opacity',1).attr('cy', yW); } else { dotWorld.style('opacity',0); }
+      if (pz) { dotWilds.style('opacity',1).attr('cy', yZ); } else { dotWilds.style('opacity',0); }
+      if (pw && pz){ diffLine.style('opacity',1).attr('x1',0).attr('x2',0).attr('y1', yW).attr('y2', yZ); }
+      else { diffLine.style('opacity',0); }
+
+      var absW = pw ? pw.players : null, absZ = pz ? pz.players : null;
+      var pctW = pw ? (100*absW/(maxWorld||1)) : null;
+      var pctZ = pz ? (100*absZ/(maxWilds||1)) : null;
+      var delta = (absW!=null && absZ!=null) ? (absW - absZ) : null;
+      var ratio = (absW!=null && absZ>0) ? (absW/absZ).toFixed(2) + ':1' : '—';
+
+      var html = '<strong>Day ' + anchor + '</strong><br/>' +
+                 '<span style="color:'+COLOR.worldLine+'">World:</span> ' + (absW!=null?absW.toLocaleString():'N/A') + 
+                 (scaleMode==='relative'?' ('+pctW.toFixed(1)+'%)':'') + '<br/>' +
+                 '<span style="color:'+COLOR.wildsLine+'">Wilds:</span> ' + (absZ!=null?absZ.toLocaleString():'N/A') + 
+                 (scaleMode==='relative'?' ('+pctZ.toFixed(1)+'%)':'') + '<br/>' +
+                 (delta!=null? ('Δ: '+delta.toLocaleString()+' / 비율: '+ratio) : '');
+      tooltip.html(html)
+        .style('left', (event.pageX + 14) + 'px')
+        .style('top',  (event.pageY - 28) + 'px');
+    });
+
+  /* 줌/팬 + 리셋 */
+  var zoom = d3.zoom()
+    .scaleExtent([1, 20])
+    .translateExtent([[0,0],[width,height]])
+    .extent([[0,0],[width,height]])
+    .on('zoom', function(event){
+      x = event.transform.rescaleX(x0);
+      render();
+    });
+  svg.call(zoom);
+  overlay.on('dblclick', function(){
+    x = x0.copy();
+    svg.call(zoom.transform, d3.zoomIdentity);
+    render();
+  });
+
+  /* 렌더 */
+  function render(){
+    xAxisG.call(d3.axisBottom(x));
+    var yAxis = (scaleMode==='relative')
+      ? d3.axisLeft(y).ticks(6).tickFormat(function(d){ return d+'%'; })
+      : d3.axisLeft(y).ticks(6, function(d){ return d>=1e6?(d/1e6)+'M':(d/1e3)+'k'; });
+    yAxisG.call(yAxis);
+
+    wildsArea.attr('d', areaGenFor('wilds'));  wildsLine.attr('d', lineGenFor('wilds'));
+    worldArea.attr('d', areaGenFor('world'));  worldLine.attr('d', lineGenFor('world'));
+
+    // 이벤트 위치 & 라벨(겹침 방지)
+    var evData = events.map(function(ev){ return { x: dayFromRelease(ev.date, ev.game), label: ev.label }; });
+    var evG = eventLayer.selectAll('.ev').data(evData);
+    evG.attr('transform', function(d){ return 'translate(' + x(d.x) + ',0)'; });
+    evG.select('line.event-line').attr('y2', height);
+
+    var anchors = evData.map(function(d){ return { x:x(d.x), width:0, d:d, xFinal:0 }; });
+    evG.each(function(d, i){
+      var g = d3.select(this);
+      var pad=4, xoff=8, yoff=10;
+      var t = g.select('text.event-label').attr('x', xoff).attr('y', yoff).text(d.label);
+      var box = t.node().getBBox();
+      g.select('rect.event-label-bg')
+        .attr('x', box.x - pad).attr('y', box.y - pad)
+        .attr('width', box.width + pad*2).attr('height', box.height + pad*2);
+      anchors[i].width = box.width + pad*2 + xoff;
+    });
+    anchors.sort(function(a,b){ return a.x - b.x; });
+    var lastRight = -Infinity;
+    for (var i=0;i<anchors.length;i++){
+      var left = anchors[i].x + 8;
+      var right = left + anchors[i].width;
+      if (left < lastRight + 6){ var shift = (lastRight + 6) - left; left += shift; right += shift; }
+      anchors[i].xFinal = left; lastRight = right;
+    }
+    evG.each(function(d){
+      var g = d3.select(this);
+      var tx = anchors.find(function(a){ return a.d.x===d.x && a.d.label===d.label; }).xFinal;
+      var t  = g.select('text.event-label').attr('x', tx);
+      var box= t.node().getBBox();
+      g.select('rect.event-label-bg')
+        .attr('x', box.x - 4).attr('y', box.y - 4)
+        .attr('width', box.width + 8).attr('height', box.height + 8);
+    });
+  }
+
+  function dayFromRelease(iso, game){
+    var t = (new Date(iso) - releaseDates[game]) / (1000*60*60*24);
+    return Math.floor(t);
+  }
+}).catch(function(err){
+  console.error('load error:', err);
+});
